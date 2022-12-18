@@ -21,20 +21,20 @@ npm install socket.io
 ---
 **FEATURES**
 
-[*] user registration
+* [x] user registration
 
-[*] user login
+* [x] user login
 
-[*] creation of conversation between users
+* [x] creation of conversation between users
 
-[*] removal of conversation
+* [x] removal of conversation
 
-[*] removal of user
+* [x] removal of user
 
-[*] Fetching users in a conversation
+* [x] Fetching users in a conversation
 
-[*] Updating of user information
+* [x] Updating of user information
 
-[*] persisting of messages to database
+* [x] persisting of messages to database
 
-[*] Fetching  a single conversation by Id
+* [x] Fetching  a single conversation by Id
