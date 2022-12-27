@@ -34,6 +34,10 @@ const io = new Server(http, {
     socket.on('start-conversation', conversationId => {
       console.log({conversationId})
       socket.join(conversationId)
+
+      socket.on('typing', data => {
+        io.to(conversationId).except(data.user).emit('typing-event', data)
+      })
     
       socket.on('create-message', message => {
         io.to(conversationId).emit('newMessage', message)

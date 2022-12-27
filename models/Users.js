@@ -10,6 +10,7 @@ const userSchema = new mongoose.Schema({
     about: {type: String, default: ''},
     friends: {type: Array, default: []},
     conversationId: {type: Array, default: []},
+    groupIds: {type: Array, default: []},
   },
   {minimize: false},
   {timestamps: true}
