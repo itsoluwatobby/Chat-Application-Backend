@@ -12,22 +12,23 @@ const helmet = require('helmet')
 const morgan = require('morgan')
 dbConfig()
 
-app.use(cors(corsOptions))
-app.use(helmet())
-app.use(express.json())
+app.use(cors(corsOptions));
+app.use(helmet());
+app.use(express.json());
 app.use(express.static('upload/images'));
-app.use(morgan('common'))
-app.use(express.urlencoded({ extended: false }))
-app.get('/', (req, res) => res.json('server up'))
+app.use(morgan('common'));
+app.use(express.urlencoded({ extended: false }));
+app.get('/', (req, res) => res.json('server up'));
+
 //users route
-app.use('/users', require('./routes/userRoute'))
+app.use('/users', require('./routes/userRoute'));
 
 const io = new Server(http, {
   cors:{
     origin: 'http://localhost:5173',
     methods: ['POST', 'GET']
   }
-})
+});
 
   io.on('connection', socket => {
 

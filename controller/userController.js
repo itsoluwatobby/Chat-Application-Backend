@@ -12,6 +12,7 @@ exports.uploadImage = asyncHandler(async(req, res) => {
 
   const user = await Users.findById(id).exec()
   if(!user) return res.status(403).json('bad credentials')
+
   const profilePicture = `http://localhost:5000/${req.file.path}`
   await user.updateOne({$set: {profilePicture}})
   res.json(user)
@@ -23,9 +24,10 @@ exports.handleRegister = asyncHandler(async(req, res) => {
   
   const duplicate = await Users.findOne({email: userDetails.email}).exec()
   if(duplicate) return res.status(409).json('email already taken')
-
+  //const profilePicture = `http://localhost:5000/${req.file.path}`
   const hashPassword = await bcrypt.hash(userDetails?.password, 10)
-  const user = await Users.create({...userDetails, password: hashPassword})
+  const user = await Users.create({ ...userDetails, password: hashPassword })
+
   res.status(201).json({status: true})
 })
 
@@ -130,6 +132,12 @@ console.log('this happened')
 exports.getConversation = asyncHandler(async(req, res) => {
   const {conversationId} = req.params
   const target = await Conversations.findById(conversationId)
+  res.status(200).json(target)
+})
+
+exports.getGroupConvo = asyncHandler(async(req, res) => {
+  const {groupId} = req.params
+  const target = await GroupConvo.findById(groupId)
   res.status(200).json(target)
 })
 
@@ -254,7 +262,7 @@ exports.createGroupConversation = asyncHandler(async(req, res) => {
     return {...member._doc, groupId: group._id}
   }))
 
-  res.status(201).json(userFriends)
+  res.status(201).json(userFriends.concat(group.groupName))
 })
 
 //get users in a group conversation

@@ -25,7 +25,9 @@ npm install socket.io
 
 * [x] user login
 
-* [x] creation of conversation between users
+* [x] creation of conversation between two users
+
+* [x] creation group conversation between two users
 
 * [x] removal of conversation
 
