@@ -15,6 +15,7 @@ dbConfig()
 app.use(cors(corsOptions))
 app.use(helmet())
 app.use(express.json())
+app.use(express.static('upload/images'));
 app.use(morgan('common'))
 app.use(express.urlencoded({ extended: false }))
 app.get('/', (req, res) => res.json('server up'))
@@ -29,15 +30,17 @@ const io = new Server(http, {
 })
 
   io.on('connection', socket => {
-    console.log('user connected')
 
     socket.on('start-conversation', conversationId => {
-      console.log({conversationId})
       socket.join(conversationId)
 
-      socket.on('typing', data => {
-        io.to(conversationId).except(data.user).emit('typing-event', data)
-      })
+      // socket.on('typing', data => {
+      //   io.to(conversationId).except(data.user).emit('typing-event', data)
+      // })
+
+      // socket.on('no-typing', data => {
+      //   io.to(conversationId).except(data.user).emit('typing-stop', data)
+      // })
     
       socket.on('create-message', message => {
         io.to(conversationId).emit('newMessage', message)
@@ -45,7 +48,6 @@ const io = new Server(http, {
     
       socket.on('disconnect', () => {
         socket.leave(conversationId)
-        console.log('user left')
       })
     })
   })
