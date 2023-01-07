@@ -17,6 +17,7 @@ exports.uploadImage = asyncHandler(async(req, res) => {
   await user.updateOne({$set: {profilePicture}})
   res.json(user)
 })
+
 //register users
 exports.handleRegister = asyncHandler(async(req, res) => {
   const userDetails = req.body
@@ -78,7 +79,7 @@ exports.handleLogout = asyncHandler(async(req, res) => {
 
   const user = await Users.findById(id).exec()
   if(!user) return res.status(403).json('bad credentials')
-  const dateTime = sub(new Date(), {minutes: 0}).toISOString()
+  const dateTime = sub(new Date(), {minutes: 0}).toISOString();
   await user.updateOne({$set: {status: 'offline', lastSeen: dateTime}})
   res.sendStatus(204)
 })
@@ -122,22 +123,36 @@ exports.createConversation = asyncHandler(async(req, res) => {
     })
     await user.updateOne({$push: {conversationId: conversation._id}})
     await friend.updateOne({$push: {conversationId: conversation._id}})
-console.log('this happened')
+
     const userFriend = {...friend._doc, convoId: conversation._id}
     res.status(201).json(userFriend)
   }
 })
 
-//delete conversation
+//get conversation
 exports.getConversation = asyncHandler(async(req, res) => {
   const {conversationId} = req.params
   const target = await Conversations.findById(conversationId)
   res.status(200).json(target)
 })
 
-exports.getGroupConvo = asyncHandler(async(req, res) => {
+//get conversation
+exports.getUserConversation = asyncHandler(async(req, res) => {
+  const {userId} = req.params
+  const target = await Conversations.find({userId}).lean()
+  res.status(200).json(target)
+})
+
+//get group conversation
+exports.getGroupConversation = asyncHandler(async(req, res) => {
   const {groupId} = req.params
-  const target = await GroupConvo.findById(groupId)
+  const target = await GroupConvo.findById(groupId).exec()
+  res.status(200).json(target)
+})
+
+exports.getGroupConvo = asyncHandler(async(req, res) => {
+  const {userId} = req.params
+  const target = await GroupConvo.find({userId}).lean()
   res.status(200).json(target)
 })
 
@@ -215,10 +230,10 @@ exports.getAllUsers = asyncHandler(async(req, res) => {
   res.status(200).json(users)  
 })
 
-//get messsages
+//create messsages
 exports.createMessage = asyncHandler(async(req, res) => {
+  console.log('hi here')
   const {conversationId, senderId, text, dateTime} = req.body
-
   const message = await Messages.create({
     conversationId, senderId, text, dateTime
   })
@@ -246,62 +261,74 @@ exports.createGroupConversation = asyncHandler(async(req, res) => {
     return Users.findById(eachId).select('-password').exec()}
   ))
   if(!groupMembers.length) return res.status(403).json('not found')
-  
-  //push ids to conversation model
+
+  //create group
+  const dateTime = sub(new Date(), {minutes: 0}).toISOString();
   const group = await GroupConvo.create({
-    members: [...memberIds, adminId], userId: adminId, groupName
+    members: [...memberIds, adminId], userId: adminId, groupName, createdTime: dateTime
   })
+  
   await user.updateOne({$push: {groupIds: group._id}});
   await Promise.all(groupMembers.map(member => member.updateOne({$push: {groupIds: group._id}})));
 
   const updatedDetails = await Promise.all(memberIds.map(eachId => {
-    return Users.findById(eachId).select('-password').exec()}
-  ))
-
-  const userFriends = await Promise.all(updatedDetails.map(member => {
-    return {...member._doc, groupId: group._id}
+    return Users.findById(eachId).select('-password').exec()
   }))
 
-  res.status(201).json(userFriends.concat(group.groupName))
+  const users = []
+  await Promise.all(updatedDetails.map(friend => {
+    var c = friend.map(fr => ({ username: fr?.username, userId: fr?._id, email: fr?.email }))
+    users.push(c)
+  }))
+
+  const groupUsers  = { members: [...users], groupName: group?.groupName, convoId: group?._id, createdAt: group?.createdTime }
+  res.status(201).json(groupUsers)
+})
+
+//delete group conversation
+exports.deleteGroupConversation = asyncHandler(async(req, res) => {
+  const { adminId, groupId } = req.params
+  if(!adminId ) return res.status(400).json('id required')
+
+  const targetGroup = await GroupConvo.findById(groupId).exec()
+  if(!targetGroup) return res.status(403).json('not found')
+
+  if(!targetGroup?.userId.equals(adminId)) return res.status(401).json('you are not authorized')
+  
+  await Promise.all(targetGroup?.members.map(eachId => {
+    return Users.findByIdAndUpdate({ _id: eachId }, {$pull: {groupIds: targetGroup?._id}})
+  }))
+  await targetGroup.deleteOne();
+  res.sendStatus(204) 
 })
 
 //get users in a group conversation
 exports.getUsersInGroupConversation = asyncHandler(async(req, res) => {
   const {userId} = req.params
   if(!userId) return res.status(400).json('userId required');
-
-  //get the target user and the userConversations ids
-  const user = await Users.findById(userId).exec()
-  if(!user) return res.status(403).json('user not found');
-
-  //get user conversations
-  const usersGroupConvos = await Promise.all(user?.groupIds.map(groupId => {
-    return GroupConvo.findById(groupId).lean()
-  }))
+  
+  const usersGroupConvos = await GroupConvo.find({userId}).lean()
   if(!usersGroupConvos?.length) return res.status(404).json('user do not have an active group');
   //get members in each conversation 
-  
-  const membersInGroup = await Promise.all(usersGroupConvos.map(convo => convo.members));
-  //check that userID is omitted  
   const friends = []
-  await membersInGroup.map(member => member.map(id => friends.push(id)))
- 
-  const usersInCovo = await Promise.all(friends.map(friendId => {
-    return Users.findById(friendId).select('-password').lean()
+  await Promise.all(usersGroupConvos.map(async({ members }) => {
+    const userMem = await Promise.all(members.map(mem => {
+      return Users.findById(mem).exec()
+    }))
+    friends.push(userMem)
+  }));
+
+  const users = []
+  await Promise.all(friends.map(friend => {
+    var c = friend.map(fr => ({ username: fr?.username, userId: fr?._id, email: fr?.email }))
+    users.push(c)
   }))
 
-  //conversation ids
-  // const conversationIds = []
-  // usersGroupConvos.map(convo => {
-  //   const { _id } = convo
-  //   conversationIds.push(_id)
-  // })
-  // console.log(conversationIds)
-  // //attach convoId
-  // const users = await usersInCovo.map((eachUser, index) => {
-  //   return { ...eachUser, groupId: conversationIds }
-  // })
-  res.status(200).json(usersInCovo)
+  const groupMembers  = users.map((n, i) => (
+    { members: [...users[i]], groupName: usersGroupConvos[i]?.groupName, convoId: usersGroupConvos[i]?._id, createdAt: usersGroupConvos[i]?.createdTime }
+  ))
+
+  res.status(200).json(groupMembers)
 })
 
 //get user friends

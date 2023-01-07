@@ -12,6 +12,7 @@ const helmet = require('helmet')
 const morgan = require('morgan')
 dbConfig()
 
+//mongoose.set('strictQuery', false)
 app.use(cors(corsOptions));
 app.use(helmet());
 app.use(express.json());
@@ -42,6 +43,9 @@ const io = new Server(http, {
       // socket.on('no-typing', data => {
       //   io.to(conversationId).except(data.user).emit('typing-stop', data)
       // })
+      socket.on('chat_opened', bool => {
+        io.in(bool.userId).emit('isOpened', bool.isChatOpened)
+      })
     
       socket.on('create-message', message => {
         io.to(conversationId).emit('newMessage', message)
