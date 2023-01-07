@@ -232,10 +232,9 @@ exports.getAllUsers = asyncHandler(async(req, res) => {
 
 //create messsages
 exports.createMessage = asyncHandler(async(req, res) => {
-  console.log('hi here')
-  const {conversationId, senderId, text, dateTime} = req.body
+  const {conversationId, senderId, text, dateTime, username} = req.body
   const message = await Messages.create({
-    conversationId, senderId, text, dateTime
+    conversationId, senderId, text, dateTime, username
   })
   res.status(200).json(message);
 })
@@ -276,8 +275,8 @@ exports.createGroupConversation = asyncHandler(async(req, res) => {
   }))
 
   const users = []
-  await Promise.all(updatedDetails.map(friend => {
-    var c = friend.map(fr => ({ username: fr?.username, userId: fr?._id, email: fr?.email }))
+  await Promise.all(updatedDetails.map(fr => {
+    var c = { username: fr?.username, userId: fr?._id, email: fr?.email }
     users.push(c)
   }))
 
@@ -298,6 +297,7 @@ exports.deleteGroupConversation = asyncHandler(async(req, res) => {
   await Promise.all(targetGroup?.members.map(eachId => {
     return Users.findByIdAndUpdate({ _id: eachId }, {$pull: {groupIds: targetGroup?._id}})
   }))
+  await Messages.deleteMany({conversationId: targetGroup?._id})
   await targetGroup.deleteOne();
   res.sendStatus(204) 
 })
@@ -306,8 +306,15 @@ exports.deleteGroupConversation = asyncHandler(async(req, res) => {
 exports.getUsersInGroupConversation = asyncHandler(async(req, res) => {
   const {userId} = req.params
   if(!userId) return res.status(400).json('userId required');
-  
-  const usersGroupConvos = await GroupConvo.find({userId}).lean()
+
+  const user = await Users.findById(userId).exec()
+  if(!user) return res.status(403).json('user not found');
+
+  const usersGroupConvos = await Promise.all(user?.groupIds.map(convoId => {
+    return GroupConvo.findById(convoId).lean()
+  }))
+
+  //const usersGroupConvos = await GroupConvo.find({userId}).lean()
   if(!usersGroupConvos?.length) return res.status(404).json('user do not have an active group');
   //get members in each conversation 
   const friends = []
