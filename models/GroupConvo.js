@@ -2,7 +2,7 @@ const mongoose = require('mongoose')
 
 const groupConvoSchema = new mongoose.Schema({
     members: {type: Array, default: []},
-    userId: {type: mongoose.Schema.Types.ObjectId, ref: 'users'},
+    adminId: {type: mongoose.Schema.Types.ObjectId, ref: 'users'},
     groupName: {type: String, required: true},
     createdTime: {type: String, default: ''}
   },

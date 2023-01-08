@@ -86,10 +86,10 @@ exports.handleLogout = asyncHandler(async(req, res) => {
 
 //create new conversation|get conversation
 exports.createConversation = asyncHandler(async(req, res) => {
-  const { userId, friendId } = req.body
-  if(!userId || !friendId) return res.status(400).json('id required')
+  const { adminId, friendId } = req.body
+  if(!adminId || !friendId) return res.status(400).json('id required')
 
-  const user = await Users.findById(userId).select('-password').exec()
+  const user = await Users.findById(adminId).select('-password').exec()
   if(!user) return res.status(403).json('not found')
 
   const friend = await Users.findById(friendId).select('-password').exec()
@@ -97,7 +97,7 @@ exports.createConversation = asyncHandler(async(req, res) => {
   
   //checking if user already exist in a conversation
   let userConversation = new Set()
-  const userExist = await Conversations.find({userId}).lean()
+  const userExist = await Conversations.find({adminId}).lean()
 
   //if(userExist.members.map(member => member.length >= 3))
   if(userExist.length){
@@ -105,8 +105,9 @@ exports.createConversation = asyncHandler(async(req, res) => {
     membersInConversation.map(singleMembers => singleMembers[1] === friendId && userConversation.add(friendId))
 
     if(!userConversation.has(friendId)){
+      const dateTime = sub(new Date(), {minutes: 0}).toISOString();
       const conversation = await Conversations.create({
-        members: [userId, friendId], userId
+        members: [adminId, friendId], adminId, createdTime: dateTime
       })
       userConversation.clear()
       await user.updateOne({$push: {conversationId: conversation._id}})
@@ -118,8 +119,9 @@ exports.createConversation = asyncHandler(async(req, res) => {
       return res.status(409).json('already exist')
     }
   }else{
+    const dateTime = sub(new Date(), {minutes: 0}).toISOString();
     const conversation = await Conversations.create({
-      members: [userId, friendId], userId
+      members: [adminId, friendId], adminId, createdTime: dateTime
     })
     await user.updateOne({$push: {conversationId: conversation._id}})
     await friend.updateOne({$push: {conversationId: conversation._id}})
@@ -138,8 +140,8 @@ exports.getConversation = asyncHandler(async(req, res) => {
 
 //get conversation
 exports.getUserConversation = asyncHandler(async(req, res) => {
-  const {userId} = req.params
-  const target = await Conversations.find({userId}).lean()
+  const {adminId} = req.params
+  const target = await Conversations.find({adminId}).lean()
   res.status(200).json(target)
 })
 
@@ -151,8 +153,8 @@ exports.getGroupConversation = asyncHandler(async(req, res) => {
 })
 
 exports.getGroupConvo = asyncHandler(async(req, res) => {
-  const {userId} = req.params
-  const target = await GroupConvo.find({userId}).lean()
+  const {adminId} = req.params
+  const target = await GroupConvo.find({adminId}).lean()
   res.status(200).json(target)
 })
 
@@ -167,25 +169,29 @@ exports.getUsersInConversation = asyncHandler(async(req, res) => {
   const userConvos = await Promise.all(user?.conversationId.map(convoId => {
     return Conversations.findById(convoId).lean()
   }))
+
+  //experiencing some null error
+  const userRes = userConvos.filter(userR => userR !== null)
   if(!userConvos?.length) return res.status(404).json('user do not have a conversation');
   //get members in each conversation 
-  const membersInConversation = await Promise.all(userConvos.map(convo => convo.members));
+  const membersInConversation = userRes && await Promise.all(userRes.map(convo => convo?.members));
   //check that userID is omitted
   const friends = []
   membersInConversation.map(member => member[0] !== userId ? friends.push(member[0]) : friends.push(member[1]))
   //fetch each users and the attach the conversation id
-  const usersInCovo = await Promise.all(friends.map(friendId => {
+  const usersInConvo = await Promise.all(friends.map(friendId => {
     return Users.findById(friendId).select('-password').lean()
   }))
+  if(!usersInConvo?.length) return res.status(404).json('user do not have a conversation');
   //conversation ids
   const conversationIds = []
-  userConvos.map(convo => {
+  userRes.map(convo => {
     const {_id, ...rest} = convo
     conversationIds.push(_id)
   })
   
   //attach convoId
-  const users = usersInCovo.map((eachUser, index) => {
+  const users = usersInConvo && usersInConvo.map((eachUser, index) => {
     return { ...eachUser, convoId: conversationIds[index] }
   })
   res.status(200).json(users)
@@ -193,23 +199,28 @@ exports.getUsersInConversation = asyncHandler(async(req, res) => {
 
 //delete conversation
 exports.deleteConversation = asyncHandler(async(req, res) => {
-  const { conversationId, userId, friendId } = req.params
-  if(!conversationId || !userId || !friendId) return res.status(400).json('id required')
+  const { conversationId, adminId } = req.params
+  if(!conversationId || !adminId) return res.status(400).json('id required')
   
-  const user = await Users.findById(userId).exec()
-  if(!user) return res.status(403).json('not found')
+  const targetGroup = await Conversations.findById(conversationId).exec()
+  if(!targetGroup) return res.status(404).json('not found')
 
-  const friend = await Users.findById(friendId).exec()
-  if(!friend) return res.status(403).json('not found')
+  if(!targetGroup?.adminId.equals(adminId)){
+    await Users.findByIdAndUpdate({ _id: adminId }, {$push: { deletedConversationIds: conversationId }})
+    // await Users.findByIdAndUpdate({ _id: adminId }, {$pull: { conversationId: conversationId }})
+    return res.status(200).json({ status: true, message: 'deleted successfully' })
+  }
 
-  const target = await Conversations.findById(conversationId)
-  if(!target) return res.status(404).json('not found')
- 
-  await user.updateOne({$pull: {conversationId: target._id}})
-  await friend.updateOne({$pull: {conversationId: target._id}})
+  await Users.findByIdAndUpdate({ _id: adminId }, {$pull: { conversationId: conversationId }})  
+  await Promise.all(targetGroup?.members.map(id => {
+    Users.findByIdAndUpdate({ _id: id }, {$pull: { deletedConversationIds: conversationId }})
+  }))
+  await Promise.all(targetGroup?.members.map(id => {
+    Users.findByIdAndUpdate({ _id: id }, {$pull: { conversationId: conversationId }})
+  }))
 
-  await Messages.deleteMany({conversationId: target._id})
-  await target.deleteOne();
+  await Messages.deleteMany({ conversationId })
+  await targetGroup.deleteOne();
   res.sendStatus(204);
 })
 
@@ -253,32 +264,24 @@ exports.createGroupConversation = asyncHandler(async(req, res) => {
   const { memberIds, groupName } = req.body
   if(!adminId || !Array.isArray(memberIds) || !memberIds.length) return res.status(400).json('id required')
 
-  const user = await Users.findById(adminId).select('-password').exec()
-  if(!user) return res.status(403).json('not found')
-
-  const groupMembers = await Promise.all(memberIds.map(eachId => {
+  const groupIds = [...memberIds, adminId]
+  const groupMembers = await Promise.all(groupIds.map(eachId => {
     return Users.findById(eachId).select('-password').exec()}
   ))
   if(!groupMembers.length) return res.status(403).json('not found')
 
+  const users = []
+  await Promise.all(groupMembers.map(fr => {
+    const filteredDetails = { username: fr?.username, userId: fr?._id, email: fr?.email }
+    users.push(filteredDetails)
+  }))
+
   //create group
   const dateTime = sub(new Date(), {minutes: 0}).toISOString();
-  const group = await GroupConvo.create({
-    members: [...memberIds, adminId], userId: adminId, groupName, createdTime: dateTime
+  const group = users.length && await GroupConvo.create({
+    members: [...memberIds, adminId], adminId, groupName, createdTime: dateTime
   })
-  
-  await user.updateOne({$push: {groupIds: group._id}});
-  await Promise.all(groupMembers.map(member => member.updateOne({$push: {groupIds: group._id}})));
-
-  const updatedDetails = await Promise.all(memberIds.map(eachId => {
-    return Users.findById(eachId).select('-password').exec()
-  }))
-
-  const users = []
-  await Promise.all(updatedDetails.map(fr => {
-    var c = { username: fr?.username, userId: fr?._id, email: fr?.email }
-    users.push(c)
-  }))
+  group && await Promise.all(groupIds.map(eachId => Users.findByIdAndUpdate({ _id: eachId }, {$push: {groupIds: group?._id}})))
 
   const groupUsers  = { members: [...users], groupName: group?.groupName, convoId: group?._id, createdAt: group?.createdTime }
   res.status(201).json(groupUsers)
@@ -292,12 +295,20 @@ exports.deleteGroupConversation = asyncHandler(async(req, res) => {
   const targetGroup = await GroupConvo.findById(groupId).exec()
   if(!targetGroup) return res.status(403).json('not found')
 
-  if(!targetGroup?.userId.equals(adminId)) return res.status(401).json('you are not authorized')
+  if(!targetGroup?.adminId.equals(adminId)){
+    await Users.findByIdAndUpdate({ _id: adminId }, {$push: { deletedConversationIds: groupId }})
+    //await Users.findByIdAndUpdate({ _id: adminId }, {$pull: { groupIds: groupId }})
+    //await targetGroup.updateOne({$pull: {members: adminId}})
+    return res.status(200).json({ status: true, message: 'deleted successfully' })
+  }
   
   await Promise.all(targetGroup?.members.map(eachId => {
-    return Users.findByIdAndUpdate({ _id: eachId }, {$pull: {groupIds: targetGroup?._id}})
+    Users.findByIdAndUpdate({ _id: eachId }, {$pull: { groupIds: targetGroup?._id }})
   }))
-  await Messages.deleteMany({conversationId: targetGroup?._id})
+  await Promise.all(targetGroup?.members.map(eachId => {
+    Users.findByIdAndUpdate({ _id: eachId }, {$pull: { deletedConversationIds: groupId,  groupIds: groupId  }})
+  }))
+  await Messages.deleteMany({ conversationId: targetGroup?._id })
   await targetGroup.deleteOne();
   res.sendStatus(204) 
 })
@@ -313,12 +324,13 @@ exports.getUsersInGroupConversation = asyncHandler(async(req, res) => {
   const usersGroupConvos = await Promise.all(user?.groupIds.map(convoId => {
     return GroupConvo.findById(convoId).lean()
   }))
-
+  //experiencing some null error
+  const userResGroup = usersGroupConvos.filter(userR => userR !== null)
   //const usersGroupConvos = await GroupConvo.find({userId}).lean()
-  if(!usersGroupConvos?.length) return res.status(404).json('user do not have an active group');
+  if(!userResGroup?.length) return res.status(404).json('user do not have an active group');
   //get members in each conversation 
   const friends = []
-  await Promise.all(usersGroupConvos.map(async({ members }) => {
+  await Promise.all(userResGroup.map(async({ members }) => {
     const userMem = await Promise.all(members.map(mem => {
       return Users.findById(mem).exec()
     }))
@@ -326,13 +338,15 @@ exports.getUsersInGroupConversation = asyncHandler(async(req, res) => {
   }));
 
   const users = []
-  await Promise.all(friends.map(friend => {
-    var c = friend.map(fr => ({ username: fr?.username, userId: fr?._id, email: fr?.email }))
-    users.push(c)
+  await Promise.all(friends.map((friend, i) => {
+    var filteredDetails = friend.map(fr => (
+      { username: fr?.username, userId: fr?._id, email: fr?.email, convoId: userResGroup[i]?._id }
+    ))
+    users.push(filteredDetails)
   }))
 
   const groupMembers  = users.map((n, i) => (
-    { members: [...users[i]], groupName: usersGroupConvos[i]?.groupName, convoId: usersGroupConvos[i]?._id, createdAt: usersGroupConvos[i]?.createdTime }
+    { members: [...users[i]], groupName: userResGroup[i]?.groupName, convoId: userResGroup[i]?._id, createdAt: userResGroup[i]?.createdTime }
   ))
 
   res.status(200).json(groupMembers)

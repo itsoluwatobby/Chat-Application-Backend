@@ -33,16 +33,25 @@ const io = new Server(http, {
 
   io.on('connection', socket => {
 
+    // socket.on('create_conversation', data => {
+    //   socket.broadcast.emit('new_conversation', data)
+    // })
+
+    // socket.on('delete_conversation', data => {
+    //   socket.broadcast.emit('newDel_conversation', data)
+    // })
+
     socket.on('start-conversation', conversationId => {
       socket.join(conversationId)
 
-      // socket.on('typing', data => {
-      //   io.to(conversationId).except(data.user).emit('typing-event', data)
-      // })
+      socket.on('typing', data => {
+        socket.broadcast.to(data?.conversationId).emit('typing-event', data)
+      })
 
-      // socket.on('no-typing', data => {
-      //   io.to(conversationId).except(data.user).emit('typing-stop', data)
-      // })
+      socket.on('no-typing', data => {
+        socket.broadcast.to(data?.conversationId).emit('typing-stop', data)
+      })
+
       socket.on('chat_opened', bool => {
         io.in(bool.userId).emit('isOpened', bool.isChatOpened)
       })
