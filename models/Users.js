@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
     conversationId: {type: Array, default: []},
     groupIds: {type: Array, default: []},
     deletedConversationIds: {type: Array, default: []},
+    deletedMessagesIds: {type: Array, default: []},
   },
   {minimize: false},
   {timestamps: true}

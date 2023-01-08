@@ -211,7 +211,6 @@ exports.deleteConversation = asyncHandler(async(req, res) => {
     return res.status(200).json({ status: true, message: 'deleted successfully' })
   }
 
-  await Users.findByIdAndUpdate({ _id: adminId }, {$pull: { conversationId: conversationId }})  
   await Promise.all(targetGroup?.members.map(id => {
     Users.findByIdAndUpdate({ _id: id }, {$pull: { deletedConversationIds: conversationId }})
   }))
