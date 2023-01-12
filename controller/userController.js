@@ -141,8 +141,14 @@ exports.getConversation = asyncHandler(async(req, res) => {
 //get conversation
 exports.getUserConversation = asyncHandler(async(req, res) => {
   const {adminId} = req.params
-  const target = await Conversations.find({adminId}).lean()
-  res.status(200).json(target)
+  const user = await Users.findById(adminId).exec();
+  const target = await Promise.all(user?.conversationId.map(id => {
+    return Conversations.findById(id).lean()
+  }))
+  const filteredTarget = target.filter(tag => tag !== null)
+  const ids = []
+  await filteredTarget.map(tag => ids.push(tag?.members[1]))
+  res.status(200).json(ids)
 })
 
 //get group conversation
@@ -201,26 +207,28 @@ exports.getUsersInConversation = asyncHandler(async(req, res) => {
 exports.deleteConversation = asyncHandler(async(req, res) => {
   const { conversationId, adminId } = req.params
   if(!conversationId || !adminId) return res.status(400).json('id required')
-  
+
   const targetGroup = await Conversations.findById(conversationId).exec()
   if(!targetGroup) return res.status(404).json('not found')
-
-  if(!targetGroup?.adminId.equals(adminId)){
-    await Users.findByIdAndUpdate({ _id: adminId }, {$push: { deletedConversationIds: conversationId }})
-    // await Users.findByIdAndUpdate({ _id: adminId }, {$pull: { conversationId: conversationId }})
-    return res.status(200).json({ status: true, message: 'deleted successfully' })
+  
+  if(!targetGroup?.adminId.equals(adminId)){  
+    const targetUser = await Users.findById(adminId).exec();
+    await targetUser.updateOne({$push: {deletedConversationIds: targetGroup?._id}})
+    await targetUser.updateOne({$pull: { conversationId: targetGroup?._id }})
+    //await targetGroup.updateOne({$pull: {members: adminId}})
+    return res.status(200).json({status: true, message: 'you deleted the conversation'})
   }
-
-  await Promise.all(targetGroup?.members.map(id => {
-    Users.findByIdAndUpdate({ _id: id }, {$pull: { deletedConversationIds: conversationId }})
-  }))
-  await Promise.all(targetGroup?.members.map(id => {
-    Users.findByIdAndUpdate({ _id: id }, {$pull: { conversationId: conversationId }})
-  }))
-
-  await Messages.deleteMany({ conversationId })
-  await targetGroup.deleteOne();
-  res.sendStatus(204);
+  else{
+    const filterIds = targetGroup?.members.filter(id => id !== null)
+    const everyMember = filterIds && await Promise.all(filterIds.map(eachId => Users.findById(eachId)))
+    const filteredMembers = everyMember && everyMember.filter(user => user !== null)
+    filteredMembers && await Promise.all(filteredMembers.map(eachUser => {
+      return eachUser.updateOne({$pull: { conversationId: targetGroup?._id, deletedConversationIds: targetGroup?._id  }})
+    }))
+    await Messages.deleteMany({conversationId: targetGroup?._id})
+    await targetGroup.deleteOne();
+    res.sendStatus(204);
+  }
 })
 
 //getUser by id
@@ -256,7 +264,9 @@ exports.getMessages = asyncHandler(async(req, res) => {
   if(!messages?.length) return res.status(404).json('no messages available')
   res.status(200).json(messages)  
 })
+function modelHelper(){
 
+}
 //create new group conversation
 exports.createGroupConversation = asyncHandler(async(req, res) => {
   const { adminId } = req.params
@@ -295,21 +305,23 @@ exports.deleteGroupConversation = asyncHandler(async(req, res) => {
   if(!targetGroup) return res.status(403).json('not found')
 
   if(!targetGroup?.adminId.equals(adminId)){
-    await Users.findByIdAndUpdate({ _id: adminId }, {$push: { deletedConversationIds: groupId }})
-    //await Users.findByIdAndUpdate({ _id: adminId }, {$pull: { groupIds: groupId }})
-    //await targetGroup.updateOne({$pull: {members: adminId}})
-    return res.status(200).json({ status: true, message: 'deleted successfully' })
+    const user = await Users.findById(adminId).exec()
+    await user.updateOne({ $push: { deletedConversationIds: groupId } }) 
+    await user.updateOne({ $pull: { groupIds: targetGroup?._id } })
+    await targetGroup.updateOne({$pull: { members: adminId }})        
+    return res.status(200).json({ status: true, message: 'you left the group successfully' })
   }
-  
-  await Promise.all(targetGroup?.members.map(eachId => {
-    Users.findByIdAndUpdate({ _id: eachId }, {$pull: { groupIds: targetGroup?._id }})
-  }))
-  await Promise.all(targetGroup?.members.map(eachId => {
-    Users.findByIdAndUpdate({ _id: eachId }, {$pull: { deletedConversationIds: groupId,  groupIds: groupId  }})
-  }))
-  await Messages.deleteMany({ conversationId: targetGroup?._id })
-  await targetGroup.deleteOne();
-  res.sendStatus(204) 
+  else{
+    const filterIds = targetGroup?.members.filter(id => id !== null)
+    const everyMember = filterIds && await Promise.all(filterIds.map(eachId => Users.findById(eachId)))
+    const filteredMembers = everyMember && everyMember.filter(user => user !== null)
+    filteredMembers && await Promise.all(filteredMembers.map(eachUser => {
+      return eachUser.updateOne({$pull: { groupIds: targetGroup?._id, deletedConversationIds: targetGroup?._id  }})
+    }))
+    await Messages.deleteMany({ conversationId: targetGroup?._id })
+    await targetGroup.deleteOne();  
+    res.sendStatus(204);
+  }
 })
 
 //get users in a group conversation

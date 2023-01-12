@@ -40,3 +40,5 @@ npm install socket.io
 * [x] persisting of messages to database
 
 * [x] Fetching  a single conversation by Id
+
+* [x] Realtime messsaging

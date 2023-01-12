@@ -4,9 +4,10 @@ const messageSchema = new mongoose.Schema({
     conversationId: {type: mongoose.Schema.Types.ObjectId, required: true, ref:'conversations'},
     senderId: {type: mongoose.Schema.Types.ObjectId, required: true, ref:'users'},
     text: {type: String, default: ''},
-    isReferenced: {type: String, default: false},
-    isChatRead: {type: String, default: false},
-    isDeleted: {type: String, default: false},
+    referencedMessageId: {type: Array, default: []},
+    isDelivered: {type: String, default: false},
+    isMessageRead: {type: String, default: false},
+    isMessageDeleted: {type: Array, default: []},
     username: {type: String, default: ''},
     dateTime: {type: String, default: ''}
   },
