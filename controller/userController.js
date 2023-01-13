@@ -250,9 +250,13 @@ exports.getAllUsers = asyncHandler(async(req, res) => {
 
 //create messsages
 exports.createMessage = asyncHandler(async(req, res) => {
-  const {conversationId, senderId, text, dateTime, username} = req.body
+  const {conversationId, senderId, text, dateTime, username, referencedId} = req.body
+
+  //fetch referenced message
+  const referenced_message = await Messages.findById(referencedId).exec()
+
   const message = await Messages.create({
-    conversationId, senderId, text, dateTime, username
+    conversationId, senderId, text, dateTime, username, referencedMessage: referenced_message
   })
   res.status(200).json(message);
 })
