@@ -4,6 +4,7 @@ const groupConvoSchema = new mongoose.Schema({
     members: {type: Array, default: []},
     adminId: {type: mongoose.Schema.Types.ObjectId, ref: 'users'},
     groupName: {type: String, required: true},
+    description: {type: String, default: ''},
     createdTime: {type: String, default: ''}
   },
   {minimize: false},

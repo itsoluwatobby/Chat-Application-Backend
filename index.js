@@ -42,18 +42,16 @@ const io = new Server(http, {
     socket.on('start-conversation', conversationId => {
       socket.join(conversationId)
 
-      console.log('user joined conversation with id: ', conversationId)
-
-      socket.on('typing', data => {
-        socket.broadcast.to(data?.conversationId).emit('typing-event', data)
+      socket.on('typing', infoData => {
+        socket.broadcast.to(infoData?.conversationId).emit('typing-event', infoData)
       })
 
-      socket.on('no-typing', data => {
-        socket.broadcast.to(data?.conversationId).emit('typing-stop', data)
+      socket.on('no-typing', infoData => {
+        socket.broadcast.to(infoData?.conversationId).emit('typing-stop', infoData)
       })
 
       socket.on('chat_opened', bool => {
-        io.in(bool.userId).emit('isOpened', bool.isChatOpened)
+        io.to(bool.userId).emit('isOpened', bool.isChatOpened)
       })
     
       socket.on('create_message', message => {
@@ -82,21 +80,25 @@ const io = new Server(http, {
       })
     })
 
-    socket.on('create', create => {
-      socket.join(create)
-
-      socket.on('create_conversation', data => {
-        io.to(create).emit('new_conversation', data)
+    socket.on('conversation', datas => {
+      socket.join(datas?._id)
+console.log('user joined:', datas?._id)
+      socket.on('create_conversation', convoData => {
+        //io.to(convoData?._id).emit('new_conversation', convoData)
+        console.log(convoData)
+        io.to([convoData?.new?._id, convoData?.myId]).emit('new_conversation', convoData?.new)
       })
 
-      socket.on('delete_conversation', data => {
-        io.to(create).emit('newDel_conversation', data)
+      socket.on('delete_conversation', convoData => {
+        io.to([convoData?.otherId, convoData?.myId]).emit('newDel_conversation', convoData?.new)
       })
 
       socket.on('disconnect', () => {
-        socket.leave(create)
+        socket.leave(datas?._id)
+        console.log('user left left left:', datas?._id)
       })
     })
+
   })
     
   mongoose.connection.once('open', () => {

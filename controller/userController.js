@@ -250,13 +250,13 @@ exports.getAllUsers = asyncHandler(async(req, res) => {
 
 //create messsages
 exports.createMessage = asyncHandler(async(req, res) => {
-  const {conversationId, senderId, text, dateTime, username, referencedId} = req.body
+  const {conversationId, senderId, text, dateTime, username, referencedId, receiverId} = req.body
 
   //fetch referenced message
   const referenced_message = await Messages.findById(referencedId).exec()
 
   const message = await Messages.create({
-    conversationId, senderId, text, dateTime, username, referencedMessage: referenced_message
+    conversationId, senderId, text, dateTime, username, receiverId, referencedMessage: referenced_message
   })
   res.status(200).json(message);
 })
@@ -298,6 +298,16 @@ exports.createGroupConversation = asyncHandler(async(req, res) => {
 
   const groupUsers  = { members: [...users], groupName: group?.groupName, convoId: group?._id, createdAt: group?.createdTime }
   res.status(201).json(groupUsers)
+})
+
+//update info
+exports.updateGroupInfo = asyncHandler(async(req, res) => {
+  const { groupName, groupDescription, groupId } = req.body;
+  if(!groupId ) return res.status(400).json('group id required');
+  const group = await GroupConvo.findById(groupId).exec();
+  await group.updateOne({$set: { groupName, description: groupDescription }});
+  const groupRes = await GroupConvo.findById(groupId).exec();
+  res.status(201).json(groupRes);
 })
 
 //delete group conversation
