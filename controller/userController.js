@@ -261,6 +261,53 @@ exports.createMessage = asyncHandler(async(req, res) => {
   res.status(200).json(message);
 })
 
+//update info
+exports.updateGroupInfo = asyncHandler(async(req, res) => {
+  const { groupName, groupDescription, groupId } = req.body;
+  if(!groupId ) return res.status(400).json('group id required');
+  const group = await GroupConvo.findById(groupId).exec();
+  await group.updateOne({$set: { groupName, description: groupDescription }});
+  const groupRes = await GroupConvo.findById(groupId).exec();
+  res.status(201).json(groupRes);
+})
+
+//update read message info
+exports.readMessage = asyncHandler(async(req, res) => {
+  const { messageId } = req.params;
+  if(!messageId ) return res.status(400).json('message id required');
+  const targetMessage = await Messages.findById(messageId).exec();
+  await targetMessage.updateOne({$set: { isMessageRead: true }});
+  const messageRes = await Messages.findById(messageId).exec();
+  res.status(201).json(messageRes);
+})
+
+//update delivered message info
+exports.deliveredMessage = asyncHandler(async(req, res) => {
+  const { messageId } = req.params;
+  if(!messageId ) return res.status(400).json('message id required');
+  const targetMessage = await Messages.findById(messageId).exec();
+  await targetMessage.updateOne({$set: { isDelivered: true }});
+  const messageRes = await Messages.findById(messageId).exec();
+  res.status(201).json(messageRes);
+})
+
+//update delete message info
+exports.deleteMessage = asyncHandler(async(req, res) => {
+  const { messageId, adminId, option } = req.body;
+  if(!messageId ) return res.status(400).json('message id required');
+  const targetMessage = await Messages.findById(messageId).exec();
+  
+  if(option?.forMe){
+    await targetMessage.updateOne({$push: { isMessageDeleted: messageId }});
+    return res.status(201).json({ status: true, message: 'message deleted' });
+  }
+  else if(option?.forAll && targetMessage?.senderId.equals(adminId)){
+    await targetMessage.updateOne({$pull: { isMessageDeleted: messageId }});
+    await targetMessage.deleteOne();
+    res.sendStatus(204)
+  }
+})
+
 //get messages
 exports.getMessages = asyncHandler(async(req, res) => {
   const {conversationId} = req.params
@@ -296,18 +343,8 @@ exports.createGroupConversation = asyncHandler(async(req, res) => {
   })
   group && await Promise.all(groupIds.map(eachId => Users.findByIdAndUpdate({ _id: eachId }, {$push: {groupIds: group?._id}})))
 
-  const groupUsers  = { members: [...users], groupName: group?.groupName, convoId: group?._id, createdAt: group?.createdTime }
+  const groupUsers  = { members: [...users], groupName: group?.groupName, convoId: group?._id, _id: group?._id, createdAt: group?.createdTime, adminId: group?.adminId, description: group?.description }
   res.status(201).json(groupUsers)
-})
-
-//update info
-exports.updateGroupInfo = asyncHandler(async(req, res) => {
-  const { groupName, groupDescription, groupId } = req.body;
-  if(!groupId ) return res.status(400).json('group id required');
-  const group = await GroupConvo.findById(groupId).exec();
-  await group.updateOne({$set: { groupName, description: groupDescription }});
-  const groupRes = await GroupConvo.findById(groupId).exec();
-  res.status(201).json(groupRes);
 })
 
 //delete group conversation
@@ -371,7 +408,7 @@ exports.getUsersInGroupConversation = asyncHandler(async(req, res) => {
   }))
 
   const groupMembers  = users.map((n, i) => (
-    { members: [...users[i]], groupName: userResGroup[i]?.groupName, convoId: userResGroup[i]?._id, createdAt: userResGroup[i]?.createdTime }
+    { members: [...users[i]], groupName: userResGroup[i]?.groupName, convoId: userResGroup[i]?._id, _id: userResGroup[i]?._id, createdAt: userResGroup[i]?.createdTime, adminId: userResGroup[i]?.adminId, description: userResGroup[i]?.description }
   ))
 
   res.status(200).json(groupMembers)

@@ -5,7 +5,11 @@ const {
   getConversation, getUsersInConversation, createMessage, 
   getUserById, createGroupConversation, 
   getUsersInGroupConversation, uploadImage, getGroupConvo, 
-  getGroupConversation, getUserConversation, deleteGroupConversation 
+  getGroupConversation, getUserConversation, deleteGroupConversation, 
+  updateGroupInfo, 
+  readMessage,
+  deliveredMessage,
+  deleteMessage
   } = require('../controller/userController')
 const router = require('express').Router();
 const multer = require('multer');
@@ -38,26 +42,43 @@ const path = require('path')
 
 //const upload = multer();
 
+{/*-------------------- AUTHENTICATION ROUTES --------------------- */}
 router.post('/register', handleRegister)
 router.post('/login', handleLogin)
-router.delete('/delete/:id', handleDelete)
-router.put('/update/:id', handleUpdate)
+router.post('/login', update)
 router.get('/logout/:id', handleLogout)
-router.get('/:userId', getUserById)
 //router.post('/:userId', upload.single('photo'), uploadImage)
 
-router.post('/create_message', createMessage)
+
+{/*-------------------- USERS ROUTES --------------------- */}
+router.put('/update/:id', handleUpdate)
+router.get('/:userId', getUserById)
 router.get('/', getAllUsers)
+router.delete('/delete/:id', handleDelete)
+
+
+{/*-------------------- CONVERSATION ROUTES --------------------- */}
 router.post('/conversation/create', createConversation)
-router.post('/conversation/create_group/:adminId', createGroupConversation)
 router.get('/conversation/:conversationId', getConversation)
-router.get('/conversation/:groupId', getGroupConversation)
 router.get('/user_conversation/:adminId', getUserConversation)
-router.get('/group_conversation/:adminId', getGroupConvo)
 router.get('/usersInConversation/:userId', getUsersInConversation)
-router.get('/usersInGroup/:userId', getUsersInGroupConversation)
 router.delete('/conversation/delete/:conversationId/:adminId', deleteConversation)
+
+
+{/*-------------------- GROUP CONVERSATION ROUTES --------------------- */}
+router.post('/conversation/create_group/:adminId', createGroupConversation)
+router.post('/conversation/update_group_info', updateGroupInfo)
+router.get('/conversation/:groupId', getGroupConversation)
+router.get('/group_conversation/:adminId', getGroupConvo)
+router.get('/usersInGroup/:userId', getUsersInGroupConversation)
 router.delete('/group_conversation/delete/:adminId/:groupId', deleteGroupConversation)
+
+
+{/*--------------------------  MESSAGES ROUTES --------------------------- */}
+router.post('/create_message', createMessage)
+router.put('/message_read/:messageId') (readMessage)
+router.put('/message_delivered/:messageId', deliveredMessage)
 router.get('/messages/:conversationId', getMessages)
+router.get('/messages_delete', deleteMessage)
 
 module.exports = router
