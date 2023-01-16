@@ -51,4 +51,4 @@ it intends to add more vibe to the chat application. To aleast enable users chat
 
 * [x] Realtime messsaging
 
-* [] Integrating openai with chat app
+* [x] Integrating openai with chat app

@@ -91,13 +91,13 @@ const io = new Server(http, {
       socket.join(datas?._id)
 console.log('user joined:', datas?._id)
       socket.on('create_conversation', convoData => {
-        //io.to(convoData?._id).emit('new_conversation', convoData)
         console.log(convoData)
-        io.to([convoData?.new?._id, convoData?.myId]).emit('new_conversation', convoData?.new)
+        //io.to(convoData?._id).emit('new_conversation', convoData)
+        socket.broadcast.to(datas?._id).emit('new_conversation', convoData)
       })
 
       socket.on('delete_conversation', convoData => {
-        io.to([convoData?.otherId, convoData?.myId]).emit('newDel_conversation', convoData?.new)
+        socket.broadcast.to(convoData?.otherId).emit('newDel_conversation', convoData)
       })
 
       socket.on('disconnect', () => {

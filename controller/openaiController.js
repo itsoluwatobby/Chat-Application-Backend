@@ -1,5 +1,7 @@
 const { Configuration, OpenAIApi } = require('openai');
 const asyncHandler = require('express-async-handler');
+const AIModel = require('../models/OpenaiRes');
+const {sub} = require('date-fns');
 
 const configuration = new Configuration({
   organization: "itsoluwatobby",
@@ -9,14 +11,28 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration)
 
 exports.openaiHandler = asyncHandler(async(req, res) => {
-  const {userInput} = req.body
+  const { userInput, userId } = req.body
 
-  const response = await openai.createCompletion({
+  const dateTime = sub(new Date(), { minutes: 0 }).toISOString()
+  const {data} = await openai.createCompletion({
     prompt: userInput,
     model: 'text-davinci-002',
     temperature: 0.5,
     max_tokens: 150
   })
 
-  res.status(200).json(response?.data)
+  const aiRes = { id: data?.id, text: data?.choices[0]?.text }
+  const result = await AIModel.create({
+    userRequest: userInput, requestDate: dateTime, userId, openAIRes: aiRes
+  })
+  res.status(201).json(result)
+})
+
+exports.getAIResponse = asyncHandler(async(req, res) => {
+  const { userId } = req.params
+  if(!userId) return res.status(40).json('userId required')
+
+  const result = await AIModel.find({userId}).lean()
+  if(!result) return res.status(403).json('no response found')
+  res.status(200).json(result)
 })
