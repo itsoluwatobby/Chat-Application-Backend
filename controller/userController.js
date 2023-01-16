@@ -266,7 +266,8 @@ exports.updateGroupInfo = asyncHandler(async(req, res) => {
   const { groupName, groupDescription, groupId } = req.body;
   if(!groupId ) return res.status(400).json('group id required');
   const group = await GroupConvo.findById(groupId).exec();
-  await group.updateOne({$set: { groupName, description: groupDescription }});
+  groupName && await group.updateOne({$set: { groupName }});
+  groupDescription && await group.updateOne({$set: { description: groupDescription }});
   const groupRes = await GroupConvo.findById(groupId).exec();
   res.status(201).json(groupRes);
 })
@@ -304,7 +305,7 @@ exports.deleteMessage = asyncHandler(async(req, res) => {
   else if(option?.forAll && targetMessage?.senderId.equals(adminId)){
     await targetMessage.updateOne({$pull: { isMessageDeleted: messageId }});
     await targetMessage.deleteOne();
-    res.sendStatus(204)
+    return res.sendStatus(204)
   }
 })
 

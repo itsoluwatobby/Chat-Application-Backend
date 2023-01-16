@@ -5,12 +5,20 @@
 ```javascript
 npm install socket.io
 ```
+***
+*Integrating OpenAI with the chat Application*
+===
+
+it intends to add more vibe to the chat application. To aleast enable users chat with a bot in cases they wish not to chat with anpther user. 
+
+---
 
 > **Tools Used**
 
 1. Node
 1. Express.js
 1. Socket.io
+1. openai
 ***
 *User Interface Dependencies*
 ===
@@ -42,3 +50,5 @@ npm install socket.io
 * [x] Fetching  a single conversation by Id
 
 * [x] Realtime messsaging
+
+* [] Integrating openai with chat app

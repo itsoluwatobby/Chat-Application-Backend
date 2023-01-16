@@ -28,6 +28,7 @@ app.get('/', (req, res) => res.json('server up'));
 
 //users route
 app.use('/users', require('./routes/userRoute'));
+app.use('/openai', require('./routes/openaiRoutes'));
 
 const io = new Server(http, {
   pingTimeout: 120000,
@@ -51,12 +52,18 @@ const io = new Server(http, {
       })
 
       socket.on('chat_opened', bool => {
+        console.log('opened:',bool.isChatOpened)
         io.to(bool.userId).emit('isOpened', bool.isChatOpened)
+      })
+
+      socket.on('chat_closed', bool => {
+        console.log('closed:',bool.isChatOpen)
+        io.to(bool.userId).emit('isClosed', bool.isChatOpen)
       })
     
       socket.on('create_message', message => {
-        io.to(message?.conversationId).emit('new_message', message)
-        //socket.broadcast.to(message?.conversationId).emit('new_message', message)
+        //io.to(message?.conversationId).emit('new_message', message)
+        socket.broadcast.to(message?.conversationId).emit('new_message', message)
       })
     
       socket.on('disconnect', () => {
