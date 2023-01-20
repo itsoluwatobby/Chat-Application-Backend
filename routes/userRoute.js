@@ -5,7 +5,8 @@ const {
   getConversation, getUsersInConversation, createMessage, 
   getUserById, createGroupConversation, 
   getUsersInGroupConversation, uploadImage, getGroupConvo, 
-  getGroupConversation, getUserConversation, deleteGroupConversation,   updateGroupInfo, readMessage, deliveredMessage, deleteMessage
+  getGroupConversation, getUserConversation, deleteGroupConversation,   
+  updateGroupInfo, readMessage, deliveredMessage, deleteMessage
   } = require('../controller/userController')
 const router = require('express').Router();
 const multer = require('multer');

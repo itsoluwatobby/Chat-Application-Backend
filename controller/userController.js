@@ -126,7 +126,7 @@ exports.createConversation = asyncHandler(async(req, res) => {
     await user.updateOne({$push: {conversationId: conversation._id}})
     await friend.updateOne({$push: {conversationId: conversation._id}})
 
-    const userFriend = {...friend._doc, convoId: conversation._id}
+    const userFriend = {...friend._doc, convoId: conversation._id, createdTime: conversation?.createdTime}
     res.status(201).json(userFriend)
   }
 })
@@ -195,10 +195,17 @@ exports.getUsersInConversation = asyncHandler(async(req, res) => {
     const {_id, ...rest} = convo
     conversationIds.push(_id)
   })
+
+  // attach the time of each conversation birth
+  const conversationBirth = []
+  userRes.map(convo => {
+    const {createdTime, ...rest} = convo
+    conversationBirth.push(createdTime)
+  })
   
-  //attach convoId
+  //attach convoId to each user
   const users = usersInConvo && usersInConvo.map((eachUser, index) => {
-    return { ...eachUser, convoId: conversationIds[index] }
+    return { ...eachUser, convoId: conversationIds[index], createdTime: conversationBirth[index] }
   })
   res.status(200).json(users)
 })
@@ -253,8 +260,10 @@ exports.createMessage = asyncHandler(async(req, res) => {
   const {conversationId, senderId, text, dateTime, username, referencedId, receiverId} = req.body
 
   //fetch referenced message
+  const user = await Users.findById(senderId).exec()
   const referenced_message = await Messages.findById(referencedId).exec()
 
+  await user.updateOne({$set: {lastMessage: {conversationId, text, dateTime, referencedId, receiverId}}});
   const message = await Messages.create({
     conversationId, senderId, text, dateTime, username, receiverId, referencedMessage: referenced_message
   })
@@ -344,7 +353,13 @@ exports.createGroupConversation = asyncHandler(async(req, res) => {
   })
   group && await Promise.all(groupIds.map(eachId => Users.findByIdAndUpdate({ _id: eachId }, {$push: {groupIds: group?._id}})))
 
-  const groupUsers  = { members: [...users], groupName: group?.groupName, convoId: group?._id, _id: group?._id, createdAt: group?.createdTime, adminId: group?.adminId, description: group?.description }
+  const groupUsers  = { 
+    members: [...users], groupName: group?.groupName, 
+    convoId: group?._id, _id: group?._id, 
+    createdAt: group?.createdTime, 
+    adminId: group?.adminId, 
+    description: group?.description 
+  }
   res.status(201).json(groupUsers)
 })
 
@@ -409,7 +424,15 @@ exports.getUsersInGroupConversation = asyncHandler(async(req, res) => {
   }))
 
   const groupMembers  = users.map((n, i) => (
-    { members: [...users[i]], groupName: userResGroup[i]?.groupName, convoId: userResGroup[i]?._id, _id: userResGroup[i]?._id, createdAt: userResGroup[i]?.createdTime, adminId: userResGroup[i]?.adminId, description: userResGroup[i]?.description }
+    { 
+      members: [...users[i]], 
+      groupName: userResGroup[i]?.groupName, 
+      convoId: userResGroup[i]?._id, 
+      _id: userResGroup[i]?._id, 
+      createdAt: userResGroup[i]?.createdTime, 
+      adminId: userResGroup[i]?.adminId, 
+      description: userResGroup[i]?.description 
+    }
   ))
 
   res.status(200).json(groupMembers)

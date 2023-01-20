@@ -36,3 +36,10 @@ exports.getAIResponse = asyncHandler(async(req, res) => {
   if(!result) return res.status(403).json('no response found')
   res.status(200).json(result)
 })
+
+exports.clearConversation = asyncHandler(async(req, res) => {
+  const { userId } = req.params
+  if(!userId) return res.status(40).json('userId required')
+  await AIModel.deleteMany({userId})
+  res.sendStatus(204)
+})

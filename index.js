@@ -41,7 +41,13 @@ const io = new Server(http, {
   io.on('connection', socket => {
 
     socket.on('start-conversation', conversationId => {
+
       socket.join(conversationId)
+
+      socket.on('leave_previous', prevConvo => {
+        socket.leave(prevConvo)
+        console.log('user left previous chat')
+      })
 
       socket.on('typing', infoData => {
         socket.broadcast.to(infoData?.conversationId).emit('typing-event', infoData)
@@ -63,7 +69,7 @@ const io = new Server(http, {
     
       socket.on('create_message', message => {
         //io.to(message?.conversationId).emit('new_message', message)
-        socket.broadcast.to(message?.conversationId).emit('new_message', message)
+        socket.broadcast.to(conversationId).emit('new_message', message)
       })
     
       socket.on('disconnect', () => {
@@ -72,6 +78,7 @@ const io = new Server(http, {
     })
 
     socket.on('start_room_conversation', roomName => {
+      socket.leave(roomName)
       socket.join(roomName)
 
       socket.emit('new_room', {groupName: roomName, message: `You created group ${roomName}`})
@@ -88,6 +95,7 @@ const io = new Server(http, {
     })
 
     socket.on('conversation', datas => {
+      socket.leave(datas?._id)
       socket.join(datas?._id)
 console.log('user joined:', datas?._id)
       socket.on('create_conversation', convoData => {
