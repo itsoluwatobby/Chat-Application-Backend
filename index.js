@@ -64,6 +64,11 @@ const io = new Server(http, {
         //io.to(message?.conversationId).emit('new_message', message)
         conversationId && socket.broadcast.to(message?.conversationId).emit('new_message', message)
       })
+
+      socket.on('reload_message', message => {
+        console.log(message)
+        conversationId && socket.broadcast.to(message?.conversationId).emit('message_reload', message)
+      })
     
       socket.on('disconnect', () => {
         socket.leave(conversationId)

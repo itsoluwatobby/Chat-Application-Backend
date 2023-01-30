@@ -5,7 +5,8 @@ const groupConvoSchema = new mongoose.Schema({
     adminId: {type: mongoose.Schema.Types.ObjectId, ref: 'users'},
     groupName: {type: String, required: true},
     description: {type: String, default: ''},
-    createdTime: {type: String, default: ''}
+    createdTime: {type: String, default: ''},
+    groupAvatar: {type: String, default: ''},
   },
   {minimize: false},
   {timestamps: true}

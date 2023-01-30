@@ -5,31 +5,33 @@ const Messages = require('../models/Messages')
 const bcrypt = require('bcrypt')
 const asyncHandler = require('express-async-handler');
 const {format, sub} =require('date-fns');
+const {cloudinary} = require('./cloudinary');
+const multer = require('multer')
 
-exports.uploadImage = asyncHandler(async(req, res) => {
-  const {id} = req.params
-  if(!id) return res.status(400).json('all fields required')
-
-  const user = await Users.findById(id).exec()
-  if(!user) return res.status(403).json('bad credentials')
-
-  const profilePicture = `http://localhost:5000/${req.file.path}`
-  await user.updateOne({$set: {profilePicture}})
-  res.json(user)
-})
+async function uploadImage(fileStr){
+  //let imageFile = JSON.stringify(fileStr)
+  const uploadResponse = await cloudinary.uploader.upload(fileStr, {
+    upload_preset: 'dwb3ksib'
+  })
+  return uploadResponse?.url
+}
 
 //register users
 exports.handleRegister = asyncHandler(async(req, res) => {
   const userDetails = req.body
   if(!userDetails?.email || !userDetails?.username || !userDetails?.password) return res.status(400).json('all fields required')
-  
+  let url
+  if(userDetails?.profilePicture){
+    url = await uploadImage(userDetails?.profilePicture)
+  }
   const duplicate = await Users.findOne({email: userDetails.email}).exec()
   if(duplicate) return res.status(409).json('email already taken')
-  //const profilePicture = `http://localhost:5000/${req.file.path}`
   const hashPassword = await bcrypt.hash(userDetails?.password, 10)
-  const user = await Users.create({ ...userDetails, password: hashPassword })
+  const user = await Users.create({ 
+    ...userDetails, password: hashPassword, profilePicture: url 
+  })
 
-  res.status(201).json({status: true})
+  res.status(201).json({ status: true })
 })
 
 //log users in
@@ -65,8 +67,16 @@ exports.handleUpdate = asyncHandler(async(req, res) => {
   const userDetails = req.body
   if(!id) return res.status(400).json('all fields required')
 
+  let url
+  if(userDetails?.profilePicture){
+    url = await uploadImage(userDetails?.profilePicture)
+  }
   const user = await Users.findById(id).exec()
   if(!user) return res.status(403).json('bad credentials')
+
+  if(userDetails?.profilePicture){
+    await user.updateOne({$set: { profilePicture: url }})
+  }
   await user.updateOne({$set: {userDetails}})
   const loggedUser = await Users.findById(user._id).select('-password').exec()
   res.status(200).json(loggedUser)
@@ -257,25 +267,37 @@ exports.getAllUsers = asyncHandler(async(req, res) => {
 
 //create messsages
 exports.createMessage = asyncHandler(async(req, res) => {
-  const {conversationId, senderId, text, dateTime, username, referencedId, receiverId} = req.body
+  const {conversationId, senderId, text, dateTime, username, referencedId, receiverId, image} = req.body
 
+  let url
+  if(image){
+    url = await uploadImage(image)
+  }
   //fetch referenced message
   const user = await Users.findById(senderId).exec()
   const referenced_message = await Messages.findById(referencedId).exec()
 
   await user.updateOne({$set: {lastMessage: {conversationId, text, dateTime, referencedId, receiverId}}});
   const message = await Messages.create({
-    conversationId, senderId, text, dateTime, username, receiverId, referencedMessage: referenced_message
+    conversationId, senderId, text, dateTime, username, receiverId, image: url, referencedMessage: referenced_message
   })
   res.status(200).json(message);
 })
 
 //update info
 exports.updateGroupInfo = asyncHandler(async(req, res) => {
-  const { groupName, groupDescription, groupId } = req.body;
+  const { groupName, groupDescription, groupId, groupAvatar } = req.body;
   if(!groupId ) return res.status(400).json('group id required');
+
+  let url
+  if(groupAvatar){
+    url = await uploadImage(groupAvatar)
+  }
   const group = await GroupConvo.findById(groupId).exec();
   groupName && await group.updateOne({$set: { groupName }});
+  if(groupAvatar){
+    await group.updateOne({$set: { groupAvatar: url }});
+  }
   groupDescription && await group.updateOne({$set: { description: groupDescription }});
   const groupRes = await GroupConvo.findById(groupId).exec();
   res.status(201).json(groupRes);
@@ -301,20 +323,75 @@ exports.deliveredMessage = asyncHandler(async(req, res) => {
   res.status(201).json(messageRes);
 })
 
+function catchError(errorCode, customMessage, next, ...params){
+  if(params.length){
+    params.every(Boolean) ? next() : res.status(errorCode).json(customMessage);
+  }
+}
+
+//add user to group conversation
+exports.addUserToGroupConversation = asyncHandler(async(req, res) => {
+  const { adminId } = req.params
+  const { groupId, memberIds} = req.body;
+  if(!groupId || !adminId || !Array.isArray(memberIds) || !memberIds?.length ) return res.status(400).json('message id required');
+
+  const groupMemberIds = [...memberIds, adminId]
+  const targetGroup = await GroupConvo.findById(groupId).exec();
+  if(!targetGroup?.adminId.equals(adminId)) return res.status(403).json('unauthorized');
+
+  const groupMembers = await Promise.all(groupMemberIds.map(eachId => {
+    return Users.findById(eachId).select('-password').exec()}
+  ))
+  if(!groupMembers.length) return res.status(400).json('not found')
+
+  const users = []
+  await Promise.all(groupMembers.map(member => {
+    const filteredDetails = { username: member?.username, userId: member?._id, email: member?.email }
+    users.push(filteredDetails)
+  }))
+
+  //update group
+  users?.length && await Promise.all(groupMemberIds.map(eachId => {
+        return targetGroup.updateOne({$push: { members: eachId }})
+      }
+    ))
+  //update users with new groupId
+  await Promise.all(groupMemberIds.map(eachId => {
+      return Users.findByIdAndUpdate({ _id: eachId }, {$push: {groupIds: targetGroup?._id}})
+    }
+  ))
+
+  const group = await GroupConvo.findById(groupId).exec();
+
+  const newGroupMembers  = { 
+    members: [...users], 
+    groupName: group?.groupName, 
+    convoId: group?._id, 
+    _id: group?._id, 
+    createdAt: group?.createdTime, 
+    adminId: group?.adminId, 
+    description: group?.description 
+  }
+  res.status(201).json(newGroupMembers)
+})
+
 //update delete message info
 exports.deleteMessage = asyncHandler(async(req, res) => {
-  const { messageId, adminId, option } = req.body;
-  if(!messageId ) return res.status(400).json('message id required');
+  const { messageId, adminId, option } = req.params;
+  if(!messageId || !adminId || !option) return res.status(400).json('message id required');
+
   const targetMessage = await Messages.findById(messageId).exec();
-  
-  if(option?.forMe){
-    await targetMessage.updateOne({$push: { isMessageDeleted: messageId }});
+  //const user = await Users.findById(adminId).exec()
+
+  if(option === 'forMe'){
+    await targetMessage.updateOne({$push: { isMessageDeleted: adminId }});
     return res.status(201).json({ status: true, message: 'message deleted' });
   }
-  else if(option?.forAll && targetMessage?.senderId.equals(adminId)){
-    await targetMessage.updateOne({$pull: { isMessageDeleted: messageId }});
+  else if(option === 'forAll' && targetMessage?.senderId.equals(adminId)){
+    // const targetUser = await Users.findById(targetMessage?.receiverId).exec();
+    // await targetUser.updateOne({$pull: {deletedMessagesIds: targetMessage?._id}});
     await targetMessage.deleteOne();
-    return res.sendStatus(204)
+    return res.sendStatus(204);
   }
 })
 
@@ -331,8 +408,13 @@ function modelHelper(){
 //create new group conversation
 exports.createGroupConversation = asyncHandler(async(req, res) => {
   const { adminId } = req.params
-  const { memberIds, groupName } = req.body
+  const { memberIds, groupName, groupAvatar } = req.body
   if(!adminId || !Array.isArray(memberIds) || !memberIds.length) return res.status(400).json('id required')
+
+  let url
+  if(groupAvatar){
+    url = await uploadImage(groupAvatar)
+  }
 
   const groupIds = [...memberIds, adminId]
   const groupMembers = await Promise.all(groupIds.map(eachId => {
@@ -349,16 +431,20 @@ exports.createGroupConversation = asyncHandler(async(req, res) => {
   //create group
   const dateTime = sub(new Date(), {minutes: 0}).toISOString();
   const group = users.length && await GroupConvo.create({
-    members: [...memberIds, adminId], adminId, groupName, createdTime: dateTime
+    members: [...memberIds, adminId], adminId, groupName, groupAvatar: url, createdTime: dateTime
   })
-  group && await Promise.all(groupIds.map(eachId => Users.findByIdAndUpdate({ _id: eachId }, {$push: {groupIds: group?._id}})))
+  group && await Promise.all(groupIds.map(eachId => {
+      return Users.findByIdAndUpdate({ _id: eachId }, {$push: {groupIds: group?._id}})
+    }
+  ))
 
   const groupUsers  = { 
     members: [...users], groupName: group?.groupName, 
     convoId: group?._id, _id: group?._id, 
     createdAt: group?.createdTime, 
     adminId: group?.adminId, 
-    description: group?.description 
+    description: group?.description, 
+    groupAvatar: group?.groupAvatar
   }
   res.status(201).json(groupUsers)
 })
@@ -431,7 +517,8 @@ exports.getUsersInGroupConversation = asyncHandler(async(req, res) => {
       _id: userResGroup[i]?._id, 
       createdAt: userResGroup[i]?.createdTime, 
       adminId: userResGroup[i]?.adminId, 
-      description: userResGroup[i]?.description 
+      description: userResGroup[i]?.description, 
+      groupAvatar: userResGroup[i]?.groupAvatar
     }
   ))
 

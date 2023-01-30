@@ -4,40 +4,13 @@ const {
   getAllUsers, createConversation, getMessages, 
   getConversation, getUsersInConversation, createMessage, 
   getUserById, createGroupConversation, 
-  getUsersInGroupConversation, uploadImage, getGroupConvo, 
+  getUsersInGroupConversation, getGroupConvo, 
   getGroupConversation, getUserConversation, deleteGroupConversation,   
-  updateGroupInfo, readMessage, deliveredMessage, deleteMessage
+  updateGroupInfo, readMessage, deliveredMessage, deleteMessage, 
+  addUserToGroupConversation
   } = require('../controller/userController')
 const router = require('express').Router();
-const multer = require('multer');
-const path = require('path')
 
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, '../upload/images')
-//   },
-//   filename: (req, file, cb) => {
-//     let ext = path.extname(file.originalname)
-//     return cb(null, file.fieldname + '_' + Date.now() + ext)
-//   }
-// })
-
-// {
-//   storage: storage,
-//   filefilter: (req, file, cb) => {
-//     if(file.mimetype === 'image/jpg' || 'image/png' || 'image/jpeg'){
-//       cb(null, true)
-//     }else {
-//       cb(null, false)
-//       return
-//     }
-//   },
-//   limits: {
-//     fileSize: 1024 * 1024 * 2
-//   }
-// }
-
-//const upload = multer();
 
 {/*-------------------- AUTHENTICATION ROUTES --------------------- */}
 router.post('/register', handleRegister)
@@ -64,8 +37,9 @@ router.delete('/conversation/delete/:conversationId/:adminId', deleteConversatio
 {/*-------------------- GROUP CONVERSATION ROUTES --------------------- */}
 router.post('/conversation/create_group/:adminId', createGroupConversation)
 router.put('/conversation/update_group_info', updateGroupInfo)
+router.put('/add_userToGroup/:adminId', addUserToGroupConversation)
 router.get('/group_conversation/:groupId', getGroupConversation)
-router.get('/group_conversation/:adminId', getGroupConvo)
+router.get('/target_group/:adminId', getGroupConvo)
 router.get('/usersInGroup/:userId', getUsersInGroupConversation)
 router.delete('/group_conversation/delete/:adminId/:groupId', deleteGroupConversation)
 
@@ -75,6 +49,6 @@ router.post('/create_message', createMessage)
 router.put('/message_read/:messageId', readMessage)
 router.put('/message_delivered/:messageId', deliveredMessage)
 router.get('/messages/:conversationId', getMessages)
-router.get('/messages_delete', deleteMessage)
+router.delete('/messages_delete/:messageId/:adminId/:option', deleteMessage)
 
 module.exports = router

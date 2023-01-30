@@ -10,7 +10,8 @@ const messageSchema = new mongoose.Schema({
     isMessageRead: {type: String, default: false},
     isMessageDeleted: {type: Array, default: []},
     username: {type: String, default: ''},
-    dateTime: {type: String, default: ''}
+    dateTime: {type: String, default: ''},
+    image: {type: String, default: ''},
   },
   {minimize: false},
   {timestamps: true}
