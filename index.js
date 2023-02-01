@@ -61,12 +61,10 @@ const io = new Server(http, {
       })
     
       socket.on('create_message', message => {
-        //io.to(message?.conversationId).emit('new_message', message)
         conversationId && socket.broadcast.to(message?.conversationId).emit('new_message', message)
       })
 
       socket.on('reload_message', message => {
-        console.log(message)
         conversationId && socket.broadcast.to(message?.conversationId).emit('message_reload', message)
       })
     

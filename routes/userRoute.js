@@ -7,7 +7,8 @@ const {
   getUsersInGroupConversation, getGroupConvo, 
   getGroupConversation, getUserConversation, deleteGroupConversation,   
   updateGroupInfo, readMessage, deliveredMessage, deleteMessage, 
-  addUserToGroupConversation
+  addUserToGroupConversation,
+  getAllGroupConvo
   } = require('../controller/userController')
 const router = require('express').Router();
 
@@ -39,6 +40,7 @@ router.post('/conversation/create_group/:adminId', createGroupConversation)
 router.put('/conversation/update_group_info', updateGroupInfo)
 router.put('/add_userToGroup/:adminId', addUserToGroupConversation)
 router.get('/group_conversation/:groupId', getGroupConversation)
+router.get('/user_group_conversations/:userId', getAllGroupConvo)
 router.get('/target_group/:adminId', getGroupConvo)
 router.get('/usersInGroup/:userId', getUsersInGroupConversation)
 router.delete('/group_conversation/delete/:adminId/:groupId', deleteGroupConversation)

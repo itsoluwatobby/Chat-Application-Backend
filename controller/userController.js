@@ -6,7 +6,6 @@ const bcrypt = require('bcrypt')
 const asyncHandler = require('express-async-handler');
 const {format, sub} =require('date-fns');
 const {cloudinary} = require('./cloudinary');
-const multer = require('multer')
 
 async function uploadImage(fileStr){
   //let imageFile = JSON.stringify(fileStr)
@@ -74,12 +73,9 @@ exports.handleUpdate = asyncHandler(async(req, res) => {
   const user = await Users.findById(id).exec()
   if(!user) return res.status(403).json('bad credentials')
 
-  if(userDetails?.profilePicture){
-    await user.updateOne({$set: { profilePicture: url }})
-  }
-  await user.updateOne({$set: {userDetails}})
+  await user.updateOne({$set: {...userDetails}})
   const loggedUser = await Users.findById(user._id).select('-password').exec()
-  res.status(200).json(loggedUser)
+  res.status(201).json(loggedUser)
 })
 
 //logout
@@ -172,6 +168,15 @@ exports.getGroupConvo = asyncHandler(async(req, res) => {
   const {adminId} = req.params
   const target = await GroupConvo.find({adminId}).lean()
   res.status(200).json(target)
+})
+
+exports.getAllGroupConvo = asyncHandler(async(req, res) => {
+  const {userId} = req.params
+  const user = await Users.findById(userId).exec()
+  const allGoups = await Promise.all(user?.groupIds.map(group => {
+    return GroupConvo.findById(group?._id).lean()
+  }))
+  res.status(200).json(allGoups)
 })
 
 exports.getUsersInConversation = asyncHandler(async(req, res) => {
@@ -381,15 +386,18 @@ exports.deleteMessage = asyncHandler(async(req, res) => {
   if(!messageId || !adminId || !option) return res.status(400).json('message id required');
 
   const targetMessage = await Messages.findById(messageId).exec();
-  //const user = await Users.findById(adminId).exec()
+  //get the message creator
+  const owner = await Users.findById(targetMessage?.senderId).exec();
 
   if(option === 'forMe'){
+    if(targetMessage?.isMessageDeleted.includes(owner?._id)){
+      await targetMessage.deleteOne();
+      return res.sendStatus(204);
+    }
     await targetMessage.updateOne({$push: { isMessageDeleted: adminId }});
     return res.status(201).json({ status: true, message: 'message deleted' });
   }
   else if(option === 'forAll' && targetMessage?.senderId.equals(adminId)){
-    // const targetUser = await Users.findById(targetMessage?.receiverId).exec();
-    // await targetUser.updateOne({$pull: {deletedMessagesIds: targetMessage?._id}});
     await targetMessage.deleteOne();
     return res.sendStatus(204);
   }
