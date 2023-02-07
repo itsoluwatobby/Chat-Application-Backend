@@ -89,13 +89,15 @@ const io = new Server(http, {
         socket.leave(roomName)
       })
     })
-
+let count = 0
     socket.on('conversation', chatApp => {
 
       chatApp && socket.join(chatApp)
-      
+      console.log(`user joined ${++count} ${chatApp}`)
       socket.on('create_conversation', convoData => {
-        chatApp && socket.broadcast.to(convoData?.room).emit('new_conversation', convoData?.convo)
+        console.log(convoData)
+        chatApp && io.to(chatApp).emit('new_conversation', convoData?.newConvo)
+        //chatApp && socket.broadcast.to(chatApp).emit('new_conversation', convoData?.newConvo)
       })
 
       socket.on('delete_conversation', convoData => {
