@@ -33,7 +33,7 @@ app.use('/openai', require('./routes/openaiRoutes'));
 const io = new Server(http, {
   pingTimeout: 120000,
   cors:{
-    origin: 'http://localhost:5173',
+    origin: 'https://whatsapp-desktop-clone.onrender.com',
     methods: ['POST', 'GET']
   }
 });
