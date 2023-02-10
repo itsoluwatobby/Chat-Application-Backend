@@ -1,5 +1,5 @@
 const allowedOrigins = [
-  'http://localhost:5173'
+  'https://whatsapp-desktop-clone.onrender.com'
 ]
 
 exports.corsOptions = {
