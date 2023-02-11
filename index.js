@@ -30,10 +30,13 @@ app.get('/', (req, res) => res.json('server up'));
 app.use('/users', require('./routes/userRoute'));
 app.use('/openai', require('./routes/openaiRoutes'));
 
+let URL_CONNECT = 'https://whatsapp-desktop-clone.onrender.com'
+let LOCAL_HOST = 'http://localhost:5173'
+
 const io = new Server(http, {
   pingTimeout: 120000,
   cors:{
-    origin: 'https://whatsapp-desktop-clone.onrender.com',
+    origin: URL_CONNECT,
     methods: ['POST', 'GET']
   }
 });
@@ -93,11 +96,8 @@ let count = 0
     socket.on('conversation', chatApp => {
 
       chatApp && socket.join(chatApp)
-      console.log(`user joined ${++count} ${chatApp}`)
       socket.on('create_conversation', convoData => {
-        console.log(convoData)
-        chatApp && io.to(chatApp).emit('new_conversation', convoData?.newConvo)
-        //chatApp && socket.broadcast.to(chatApp).emit('new_conversation', convoData?.newConvo)
+        chatApp && socket.broadcast.to(chatApp).emit('new_conversation', convoData?.conversation)
       })
 
       socket.on('delete_conversation', convoData => {
